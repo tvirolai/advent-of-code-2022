@@ -14,16 +14,12 @@
   (get priority-map (int c)))
 
 (defn get-shared-item [line]
-  (let [pivot (/ (count line) 2)
-        hd (subs line 0 pivot)
-        tl (subs line pivot)]
-    (first (cset/intersection (set hd) (set tl)))))
+  (let [pivot (/ (count line) 2)]
+    (first (cset/intersection (set (subs line 0 pivot))
+                              (set (subs line pivot))))))
 
 (defn part-01 []
-  (->> input
-       (map get-shared-item)
-       (map get-priority)
-       (reduce +)))
+  (transduce (map (comp get-priority get-shared-item)) + input))
 
 (defn get-shared-item-02 [lines]
   (->> lines
@@ -32,8 +28,6 @@
        first))
 
 (defn part-02 []
-  (->> input
-       (partition 3)
-       (map get-shared-item-02)
-       (map get-priority)
-       (reduce +)))
+  (transduce (comp (partition-all 3)
+                   (map get-shared-item-02)
+                   (map get-priority)) + input))
