@@ -41,14 +41,17 @@
                   (assoc to (conj dest (peek source))))]
       (recur sts (->Instr (dec amount) from to)))))
 
+(defn state->res [state]
+  (->> state
+       (into (sorted-map))
+       vals
+       (map first)
+       (apply str)))
+
 (defn part-01 []
   (let [[stacks instrs] (read-input)
         end-state (reduce next-state stacks instrs)]
-    (->> end-state
-         (into (sorted-map))
-         vals
-         (map first)
-         (apply str))))
+    (state->res end-state)))
 
 (defn next-state-02 [stacks {:keys [amount from to]}]
   (let [source (stacks from)
@@ -60,8 +63,4 @@
 (defn part-02 []
   (let [[stacks instrs] (read-input)
         end-state (reduce next-state-02 stacks instrs)]
-    (->> end-state
-         (into (sorted-map))
-         vals
-         (map first)
-         (apply str))))
+    (state->res end-state)))
