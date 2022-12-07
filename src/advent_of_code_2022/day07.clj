@@ -24,13 +24,16 @@
 
 (defrecord Directory [name size subdirs])
 
+(defn- parse-qualified-dirname [name dir-stack]
+  (s/replace (str (s/join "/" dir-stack) "/" name)
+             "//" "/"))
+
 (defn parse-dirs [rows curr res dir-stack]
   (let [{:keys [type cmd arg name size]} (first rows)]
     (cond
       (empty? rows) (conj res curr)
       (= :directory type) (recur (rest rows)
-                                 (update curr :subdirs conj (s/replace (str (s/join "/" dir-stack) "/" name)
-                                                                       "//" "/"))
+                                 (update curr :subdirs conj (parse-qualified-dirname name dir-stack))
                                  res
                                  dir-stack)
       (= :file type) (recur (rest rows)
@@ -40,8 +43,9 @@
       (= :command type) (cond
                           (= ".." arg) (recur (rest rows) curr res (pop dir-stack))
                           (= "ls" cmd) (recur (rest rows) curr res dir-stack)
-                          (= "cd" cmd) (recur (rest rows) (->Directory (s/replace (str (s/join "/" dir-stack) "/" arg)
-                                                                                  "//" "/") 0 []) (conj res curr) (conj dir-stack arg))))))
+                          (= "cd" cmd) (recur (rest rows) (->Directory (parse-qualified-dirname arg dir-stack) 0 [])
+                                              (conj res curr)
+                                              (conj dir-stack arg))))))
 
 (defn total-size
   "Takes a sequence of directories and a single dir. Returns the dir
@@ -77,7 +81,6 @@
         unused-space (- total-space used-size)]
     (->> dirs-with-sizes
          (map :total-size)
-         (filter (fn [v]
-                   (>= (+ v unused-space) space-needed)))
+         (filter #(>= (+ % unused-space) space-needed))
          sort
          first)))
