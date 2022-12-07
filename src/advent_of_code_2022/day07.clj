@@ -2,7 +2,7 @@
   (:require [clojure.string :as s]))
 
 (def input
-  "resources/day07_test.txt")
+  "resources/day07.txt")
 
 (defrecord Command [type cmd arg])
 
@@ -25,15 +25,12 @@
 (defrecord Directory [name size subdirs])
 
 (defn parse-dirs [rows curr res dir-stack]
-  (let [{:keys [type cmd arg name size] :as curr-row} (first rows)
-        curr-path (s/join dir-stack "/")]
-    (println dir-stack)
-    (println curr)
+  (let [{:keys [type cmd arg name size]} (first rows)]
     (cond
       (empty? rows) (conj res curr)
       (= :directory type) (recur (rest rows)
-                                 (update curr :subdirs conj (str curr-path (when-not (= "/" curr-path)
-                                                                             "/") name))
+                                 (update curr :subdirs conj (s/replace (str (s/join "/" dir-stack) "/" name)
+                                                                       "//" "/"))
                                  res
                                  dir-stack)
       (= :file type) (recur (rest rows)
@@ -42,38 +39,45 @@
                             dir-stack)
       (= :command type) (cond
                           (= ".." arg) (recur (rest rows) curr res (pop dir-stack))
-                          (= "cd" cmd) (recur (rest rows) curr res (conj dir-stack arg))
                           (= "ls" cmd) (recur (rest rows) curr res dir-stack)
-                          :else (recur (rest rows) (->Directory (str dir-stack "/" arg) 0 []) res dir-stack))
-      #_(if (or (#{nil ".."} arg) (= "ls" cmd))
-
-          (recur (rest rows) curr res)
-          (recur (rest rows)
-                 (->Directory arg 0 [])
-                 (if (nil? curr)
-                   res
-                   (conj res curr)))))))
+                          (= "cd" cmd) (recur (rest rows) (->Directory (s/replace (str (s/join "/" dir-stack) "/" arg)
+                                                                                  "//" "/") 0 []) (conj res curr) (conj dir-stack arg))))))
 
 (defn total-size
   "Takes a sequence of directories and a single dir. Returns the dir
   with a total size added."
   [dirs dir-name]
-  (let [{:keys [size subdirs]} (->> dirs
-                                    (filter #(= dir-name (:name %)))
-                                    first)]
+  (let [{:keys [size subdirs] :as d} (->> dirs
+                                          (filter #(= dir-name (:name %)))
+                                          first)]
     (if (empty? subdirs)
       size
       (reduce + size (map (partial total-size dirs) subdirs)))))
 
 (defn part-01 []
   (let [data (parse-input input)
-        dirs (parse-dirs data (->Directory "/" 0 []) [] [])
+        dirs (rest (parse-dirs data (->Directory "/" 0 []) [] []))
         dirs-with-sizes (for [{:keys [name] :as d} dirs]
                           (assoc d :total-size (total-size dirs name)))]
-    dirs
-    #_(reduce (fn [acc {:keys [total-size]}]
-                (if (<= total-size 100000)
-                  (+ acc total-size)
-                  acc))
-              0
-              dirs-with-sizes)))
+    (reduce (fn [acc {:keys [total-size]}]
+              (if (<= total-size 100000)
+                (+ acc total-size)
+                acc))
+            0
+            dirs-with-sizes)))
+
+(defn part-02 []
+  (let [total-space 70000000
+        space-needed 30000000
+        data (parse-input input)
+        dirs (rest (parse-dirs data (->Directory "/" 0 []) [] []))
+        dirs-with-sizes (for [{:keys [name] :as d} dirs]
+                          (assoc d :total-size (total-size dirs name)))
+        used-size (:total-size (first (filter #(= "/" (:name %)) dirs-with-sizes)))
+        unused-space (- total-space used-size)]
+    (->> dirs-with-sizes
+         (map :total-size)
+         (filter (fn [v]
+                   (>= (+ v unused-space) space-needed)))
+         sort
+         first)))
